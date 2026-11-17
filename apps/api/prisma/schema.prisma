@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  STAFF
+}
+
+enum ExamType {
+  RAIO_X
+  ULTRASSOM
+  RESSONANCIA_MAGNETICA
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ReportStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         UserRole
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patientProfile      PatientProfile?
+  patientAppointments Appointment[]   @relation("PatientAppointments")
+  patientReports      MedicalReport[] @relation("PatientReports")
+  authoredReports     MedicalReport[] @relation("StaffReports")
+}
+
+model PatientProfile {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  dateOfBirth DateTime? @db.Date
+  documentId  String?   @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  patientId      String
+  examType       ExamType
+  status         AppointmentStatus @default(SCHEDULED)
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  checkedInAt    DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  patient       User           @relation("PatientAppointments", fields: [patientId], references: [id])
+  medicalReport MedicalReport?
+
+  @@index([scheduledStart, scheduledEnd])
+  @@index([patientId, scheduledStart])
+  @@index([examType, scheduledStart])
+}
+
+model MedicalReport {
+  id              String       @id @default(uuid())
+  appointmentId   String       @unique
+  patientId       String
+  authoredById    String
+  title           String
+  content         String
+  responsibleName String
+  status          ReportStatus @default(DRAFT)
+  publishedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  patient     User        @relation("PatientReports", fields: [patientId], references: [id])
+  authoredBy  User        @relation("StaffReports", fields: [authoredById], references: [id])
+
+  @@index([patientId, status, publishedAt])
+}
