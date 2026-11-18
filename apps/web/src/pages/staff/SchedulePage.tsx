@@ -105,9 +105,6 @@ export function StaffSchedulePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Agenda da Clínica</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Cada exame possui duração fixa de 30 minutos. Agendamentos cancelados liberam o horário automaticamente.
-        </p>
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

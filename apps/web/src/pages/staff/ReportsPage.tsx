@@ -28,9 +28,6 @@ export function StaffReportsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Laudos Médicos</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Rascunhos são visíveis apenas para a equipe. Laudos publicados ficam disponíveis ao paciente e não podem mais ser editados.
-        </p>
       </div>
 
       {reports.length === 0 ? (

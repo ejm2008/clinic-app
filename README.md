@@ -118,3 +118,35 @@ npm --workspace=apps/web test
    ```
 
    > O `e2e/playwright.config.ts` reutiliza automaticamente os servidores se `npm run dev` já estiver rodando em `http://localhost:5173`, ou os inicia automaticamente caso não estejam.
+
+---
+
+## 4. Decisões Técnicas
+
+### Origem e planejamento (`/plan`)
+
+O projeto foi concebido a partir de um planejamento inicial (`/plan`) estruturado em **monorepo com npm workspaces** para isolar responsabilidades sem duplicar regras de negócio:
+
+- `packages/shared`: fonte única para enums (`UserRole`, `ExamType`, `AppointmentStatus`, `ReportStatus`), DTOs e schemas de validação (`zod`).
+- `apps/api`: API REST em Express + TypeScript conectada ao PostgreSQL via Prisma ORM.
+- `apps/web`: SPA em React + Vite + Tailwind CSS + TanStack Query + React Router.
+- `e2e`: suíte de testes ponta a ponta com Playwright.
+
+### Escolhas de arquitetura e implementação
+
+- **PostgreSQL + Prisma ORM**: escolhido pela consistência transacional (ACID) e integridade referencial entre usuários, perfis de pacientes, agendamentos e laudos. O agendamento utiliza transação com isolamento `Serializable` para impedir condições de corrida no bloqueio de horários de 30 minutos.
+- **Interoperabilidade do `@clinic/shared`**: o pacote compila para CommonJS (`packages/shared/tsconfig.json` com `moduleResolution: "Node"`) para atender a API e o Jest, enquanto o `apps/web/vite.config.ts` aponta `@clinic/shared` via `resolve.alias` diretamente para `packages/shared/src/index.ts`, permitindo consumo nativo em ESM pelo Vite.
+- **Cancelamento em vez de exclusão física**: agendamentos não possuem remoção (`DELETE`); o cancelamento altera o status para `CANCELLED`, preservando o histórico e liberando automaticamente o horário para novos agendamentos (exceto quando já há laudo publicado).
+- **Visibilidade e imutabilidade de laudos**: laudos em `DRAFT` são acessíveis apenas pela equipe (`STAFF`). Após publicados (`PUBLISHED`), tornam-se somente leitura e visíveis exclusivamente para o paciente vinculado.
+- **Testes em duas camadas**:
+  - **Jest** (`apps/api` com `supertest` e mock do Prisma; `apps/web` com React Testing Library) para feedback rápido de regras de negócio e componentes.
+  - **Playwright** (`e2e/tests/clinic.spec.ts`) para validar os fluxos reais entre interface, API e banco PostgreSQL.
+
+### Possíveis melhorias
+
+- **Múltiplas salas e profissionais**: evoluir a verificação de conflito de horário para considerar sala/equipamento específico e profissional responsável.
+- **Migrações versionadas (`prisma migrate`)**: adotar histórico formal de migrations em `apps/api/prisma/migrations` no lugar de `prisma db push` para ambientes de produção.
+- **Paginação nas listagens**: implementar paginação e ordenação nas rotas de agendamentos, laudos e pacientes para escalar com grandes volumes de dados.
+- **Exportação em PDF e notificações**: permitir download de laudos publicados em PDF e envio de notificações (e-mail/SMS) ao confirmar agendamentos ou publicar laudos.
+- **Recuperação de senha e refresh tokens**: adicionar fluxo de redefinição de senha e renovação de sessão para maior segurança em produção.
+- **Ajuste completo de `typecheck` e CI**: alinhar `moduleResolution` em `apps/api/tsconfig.json` e adicionar tipos `vite/client` em `apps/web` para que `npm run typecheck` passe integralmente em todos os workspaces, integrando `typecheck`, `npm test` e `npm run test:e2e` em uma pipeline de CI.
